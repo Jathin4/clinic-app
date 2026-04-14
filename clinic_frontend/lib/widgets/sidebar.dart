@@ -130,7 +130,7 @@ List<NavSection> getVisibleSections(String role) {
 }
 
 // ── Design tokens ──────────────────────────────────────────────
-const _sidebarBg = Color(0xFF0A5955);
+const _sidebarBg = Color(0xFF0C6256);
 const _sidebarWidth = 256.0;
 const _collapsedWidth = 68.0;
 

@@ -18,6 +18,7 @@ import 'payments_screen.dart';
 import 'placeholder_screen.dart';
 import 'users_screen.dart';
 import 'home_screen.dart';
+import 'profile_screen.dart';
 
 class MainLayout extends StatefulWidget {
   const MainLayout({super.key});
@@ -60,8 +61,6 @@ class _MainLayoutState extends State<MainLayout> {
         return const DashboardScreen();
       case 'clinics':
         return const ClinicsScreen();
-      case 'users':
-        return const UsersScreen();
       case 'patients':
         return const PatientsScreen();
       case 'appointments':
@@ -74,6 +73,8 @@ class _MainLayoutState extends State<MainLayout> {
         return const PaymentsScreen();
       case 'inventory':
         return const InventoryScreen();
+      case 'users':
+        return const UsersScreen();
       case 'reports':
         return const PlaceholderScreen(
             title: 'Reports', icon: Icons.bar_chart_outlined);
@@ -121,8 +122,7 @@ class _MainLayoutState extends State<MainLayout> {
         );
       }
     } else if (_selectedBottomIndex == 1) {
-      mainContent = const PlaceholderScreen(
-          title: 'My Profile', icon: Icons.person_outline);
+  mainContent = const ProfileScreen();
     } else {
       mainContent = const PlaceholderScreen(
           title: 'Help', icon: Icons.headset_mic_outlined);
