@@ -14,7 +14,8 @@ import 'placeholder_screen.dart';
 
 class HomeScreen extends StatelessWidget {
   final void Function(int) onTabChange;
-  const HomeScreen({super.key, required this.onTabChange});
+  final void Function(String pageId)? onNavigate; // ADD THIS
+  const HomeScreen({super.key, required this.onTabChange, this.onNavigate});
 
   static const List<Map<String, dynamic>> _items = [
     {
@@ -90,10 +91,28 @@ class HomeScreen extends StatelessWidget {
     }
   }
 
+  String _pageIdFor(String title) {
+  switch (title) {
+    case 'Patients':      return 'patients';
+    case 'Appointments':  return 'appointments';
+    case 'Encounters':    return 'encounters';
+    case 'Bills':         return 'bills';
+    case 'Payments':      return 'payments';
+    case 'Inventory':     return 'inventory';
+    case 'Clinics':       return 'clinics';
+    case 'Dashboard':     return 'dashboard';
+    default:              return title.toLowerCase();
+  }
+}
+
   void _push(BuildContext context, String title) {
+  if (onNavigate != null) {
+    onNavigate!(_pageIdFor(title));
+  } else {
     Navigator.push(
         context, MaterialPageRoute(builder: (_) => _screenFor(title)));
   }
+}
 
   Future<void> _showLogoutDialog(BuildContext context) async {
     final provider = context.read<AppProvider>();
@@ -133,6 +152,7 @@ class HomeScreen extends StatelessWidget {
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
               colors: [AppColors.tealDark, AppColors.teal],
+              
             ),
           ),
           padding: EdgeInsets.only(

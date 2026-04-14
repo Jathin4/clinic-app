@@ -32,6 +32,10 @@ class _MainLayoutState extends State<MainLayout> {
   // Bottom nav tabs: 0=Home, 1=Profile, 2=Help
   int _selectedBottomIndex = 0;
 
+  // null means "show HomeScreen grid", non-null means a sidebar item was tapped
+  // We track this separately so Home tab always returns to grid
+  String? _activeSidebarPage; // <-- NEW
+
   static const List<Map<String, dynamic>> _navItems = [
     {'iconName': 'Home', 'label': 'Home'},
     {'iconName': 'Profile', 'label': 'Profile'},
@@ -49,7 +53,7 @@ class _MainLayoutState extends State<MainLayout> {
     );
   }
 
-  /// Maps provider page string → actual screen widget
+  /// Maps page string → actual screen widget
   Widget _screenForPage(String page) {
     switch (page) {
       case 'dashboard':
@@ -91,12 +95,31 @@ class _MainLayoutState extends State<MainLayout> {
     final isDesktop = MediaQuery.of(context).size.width >= 1024;
     final isMobile = !isDesktop;
 
-    // Decide what the body shows based on bottom tab
+    // ── Mobile body logic ──────────────────────────────────────
+    // If a sidebar item was tapped → show that screen with a back button
+    // Otherwise → show the bottom-tab content
     Widget mainContent;
     if (_selectedBottomIndex == 0) {
-      mainContent = HomeScreen(
-          onTabChange: (i) =>
-              setState(() => _selectedBottomIndex = i)); // ✅ shows grid first
+      if (_activeSidebarPage != null) {
+        // Show the sidebar-selected screen with a back arrow
+        mainContent = _ScreenWithBack(
+          title: _pageTitleFor(_activeSidebarPage!),
+          child: _screenForPage(_activeSidebarPage!),
+          onBack: () {
+            setState(() => _activeSidebarPage = null);
+            // Also clear the active highlight in the sidebar
+            provider.setPage(''); // blank = nothing highlighted
+          },
+        );
+      } else {
+        mainContent = HomeScreen(
+          onTabChange: (i) => setState(() => _selectedBottomIndex = i),
+          onNavigate: (pageId) {
+            setState(() => _activeSidebarPage = pageId);
+            context.read<AppProvider>().setPage(pageId);
+          },
+        );
+      }
     } else if (_selectedBottomIndex == 1) {
       mainContent = const PlaceholderScreen(
           title: 'My Profile', icon: Icons.person_outline);
@@ -105,7 +128,6 @@ class _MainLayoutState extends State<MainLayout> {
           title: 'Help', icon: Icons.headset_mic_outlined);
     }
 
-    // REPLACE the entire return statement with this:
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: const SystemUiOverlayStyle(
         statusBarColor: _navColor,
@@ -114,6 +136,12 @@ class _MainLayoutState extends State<MainLayout> {
       child: PopScope(
         canPop: false,
         onPopInvokedWithResult: (didPop, result) {
+          // If a sidebar screen is open, go back instead of exiting
+          if (_activeSidebarPage != null) {
+            setState(() => _activeSidebarPage = null);
+            provider.setPage('');
+            return;
+          }
           showCupertinoDialog(
             context: context,
             builder: (ctx) => CupertinoAlertDialog(
@@ -134,63 +162,64 @@ class _MainLayoutState extends State<MainLayout> {
           );
         },
         child: Stack(
-          // <-- Wrap everything in Stack
           children: [
             Scaffold(
               backgroundColor: Colors.white,
-              body: isMobile
-                  ? Stack(
-                      children: [
-                        AnimatedSwitcher(
-                          duration: const Duration(milliseconds: 220),
-                          child: KeyedSubtree(
-                            key: ValueKey(
-                              _selectedBottomIndex == 0
-                                  ? provider.page
-                                  : 'tab$_selectedBottomIndex',
-                            ),
-                            child: mainContent,
-                          ),
-                        ),
-                        LoadingOverlay(
-                          isLoading: provider.isLoading,
-                          message: provider.loadingMessage,
-                          type: provider.page,
-                        ),
-                      ],
-                    )
-                  : Row(
-                      children: [
-                        const Sidebar(),
-                        Expanded(
-                          child: Column(
-                            children: [
-                              const TopNav(),
-                              Expanded(
-                                child: Stack(
-                                  children: [
-                                    AnimatedSwitcher(
-                                      duration:
-                                          const Duration(milliseconds: 220),
-                                      child: KeyedSubtree(
-                                        key: ValueKey(provider.page),
-                                        child: _screenForPage(provider.page),
-                                      ),
-                                    ),
-                                    LoadingOverlay(
-                                      isLoading: provider.isLoading,
-                                      message: provider.loadingMessage,
-                                      type: provider.page,
-                                    ),
-                                  ],
-                                ),
+              body: SafeArea(
+                // <-- FIX 1: wraps entire body so status bar is respected
+                child: isMobile
+                    ? Stack(
+                        children: [
+                          AnimatedSwitcher(
+                            duration: const Duration(milliseconds: 220),
+                            child: KeyedSubtree(
+                              key: ValueKey(
+                                _activeSidebarPage ??
+                                    'tab$_selectedBottomIndex',
                               ),
-                            ],
+                              child: mainContent,
+                            ),
                           ),
-                        ),
-                      ],
-                    ),
-              bottomNavigationBar: isMobile
+                          LoadingOverlay(
+                            isLoading: provider.isLoading,
+                            message: provider.loadingMessage,
+                            type: provider.page,
+                          ),
+                        ],
+                      )
+                    : Row(
+                        children: [
+                          const Sidebar(),
+                          Expanded(
+                            child: Column(
+                              children: [
+                                const TopNav(),
+                                Expanded(
+                                  child: Stack(
+                                    children: [
+                                      AnimatedSwitcher(
+                                        duration:
+                                            const Duration(milliseconds: 220),
+                                        child: KeyedSubtree(
+                                          key: ValueKey(provider.page),
+                                          child: _screenForPage(provider.page),
+                                        ),
+                                      ),
+                                      LoadingOverlay(
+                                        isLoading: provider.isLoading,
+                                        message: provider.loadingMessage,
+                                        type: provider.page,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+              ),
+              bottomNavigationBar: isMobile && _activeSidebarPage == null
                   ? SafeArea(
                       bottom: true,
                       child: Container(
@@ -224,7 +253,7 @@ class _MainLayoutState extends State<MainLayout> {
                   : null,
             ),
 
-            // Sidebar overlay — outside Scaffold, covers everything including bottom nav
+            // ── Mobile sidebar overlay ─────────────────────────
             if (isMobile && provider.mobileSidebar) ...[
               Positioned.fill(
                 child: GestureDetector(
@@ -240,9 +269,14 @@ class _MainLayoutState extends State<MainLayout> {
                 child: Material(
                   elevation: 16,
                   child: Sidebar(
-                    onItemTapped: () {
+                    onItemTapped: (String pageId) {
+                      // FIX 3 & 4: actually navigate + switch to Home tab
                       provider.setMobileSidebar(false);
-                      setState(() => _selectedBottomIndex = 0);
+                      provider.setPage(pageId);
+                      setState(() {
+                        _selectedBottomIndex = 0;
+                        _activeSidebarPage = pageId; // <-- drives the screen
+                      });
                     },
                   ),
                 ),
@@ -254,12 +288,40 @@ class _MainLayoutState extends State<MainLayout> {
     );
   }
 
+  /// Human-readable title for a page id
+  String _pageTitleFor(String page) {
+    const titles = {
+      'dashboard': 'Dashboard',
+      'clinics': 'Clinics',
+      'users': 'Users',
+      'patients': 'Patients',
+      'appointments': 'Appointments',
+      'encounters': 'Encounters',
+      'bills': 'Bills',
+      'payments': 'Payments',
+      'inventory': 'Inventory',
+      'reports': 'Reports',
+      'settings': 'Settings',
+      'my-profile': 'My Profile',
+    };
+    return titles[page] ?? 'Screen';
+  }
+
   Widget _buildNavItem(String iconName, String label, int index) {
     final isSelected = _selectedBottomIndex == index;
     return Expanded(
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
-        onTap: () => setState(() => _selectedBottomIndex = index),
+        onTap: () {
+          setState(() {
+            _selectedBottomIndex = index;
+            // Tapping Home tab clears any open sidebar screen
+            if (index == 0) {
+              _activeSidebarPage = null;
+              provider_setPageBlank(context);
+            }
+          });
+        },
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -283,6 +345,10 @@ class _MainLayoutState extends State<MainLayout> {
     );
   }
 
+  void provider_setPageBlank(BuildContext context) {
+    context.read<AppProvider>().setPage('');
+  }
+
   IconData _navIcon(String iconName) {
     switch (iconName) {
       case 'Home':
@@ -294,5 +360,55 @@ class _MainLayoutState extends State<MainLayout> {
       default:
         return Icons.circle;
     }
+  }
+}
+
+// ── Back-button wrapper ────────────────────────────────────────
+class _ScreenWithBack extends StatelessWidget {
+  final String title;
+  final Widget child;
+  final VoidCallback onBack;
+  const _ScreenWithBack(
+      {required this.title, required this.child, required this.onBack});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        // Top bar with back arrow
+        Container(
+          height: 56,
+          padding: const EdgeInsets.symmetric(horizontal: 8),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.05),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              )
+            ],
+          ),
+          child: Row(
+            children: [
+              IconButton(
+                icon: const Icon(Icons.arrow_back_ios_new_rounded,
+                    size: 18, color: Color(0xFF0E6C68)),
+                onPressed: onBack,
+              ),
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 17,
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFF191C1D),
+                ),
+              ),
+            ],
+          ),
+        ),
+        Expanded(child: child),
+      ],
+    );
   }
 }

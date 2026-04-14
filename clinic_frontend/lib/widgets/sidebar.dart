@@ -130,12 +130,13 @@ List<NavSection> getVisibleSections(String role) {
 }
 
 // ── Design tokens ──────────────────────────────────────────────
-const _sidebarBg = Color(0xFF0A5955); // tealDark
+const _sidebarBg = Color(0xFF0A5955);
 const _sidebarWidth = 256.0;
 const _collapsedWidth = 68.0;
 
+// FIX 2: onItemTapped now receives the pageId so MainLayout can act on it
 class Sidebar extends StatelessWidget {
-  final VoidCallback? onItemTapped;
+  final void Function(String pageId)? onItemTapped;
   const Sidebar({super.key, this.onItemTapped});
 
   @override
@@ -151,9 +152,7 @@ class Sidebar extends StatelessWidget {
       duration: const Duration(milliseconds: 250),
       curve: Curves.easeInOut,
       width: collapsed ? _collapsedWidth : _sidebarWidth,
-      decoration: const BoxDecoration(
-        color: _sidebarBg,
-      ),
+      decoration: const BoxDecoration(color: _sidebarBg),
       child: Column(
         children: [
           _SidebarHeader(collapsed: collapsed),
@@ -191,54 +190,59 @@ class _SidebarHeader extends StatelessWidget {
   final bool collapsed;
   const _SidebarHeader({required this.collapsed});
 
-  // In _SidebarHeader build(), REPLACE with:
   @override
   Widget build(BuildContext context) {
     final provider = context.read<AppProvider>();
     final isMobile = MediaQuery.of(context).size.width < 1024;
 
-    return Container(
-      height: 68,
-      padding: const EdgeInsets.symmetric(horizontal: 14),
-      child: Row(
-        children: [
-          Container(
-            width: 38,
-            height: 38,
-            decoration: BoxDecoration(
-              color: Colors.white12,
-              borderRadius: BorderRadius.circular(12),
+    // FIX 1: add top padding so ClinicOS title clears the status bar
+    return SafeArea(
+      bottom: false,
+      child: Container(
+        height: 68,
+        padding: const EdgeInsets.symmetric(horizontal: 14),
+        child: Row(
+          children: [
+            Container(
+              width: 38,
+              height: 38,
+              decoration: BoxDecoration(
+                color: Colors.white12,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(Icons.favorite_border,
+                  color: Colors.white, size: 18),
             ),
-            child: const Icon(Icons.favorite_border,
-                color: Colors.white, size: 18),
-          ),
-          const SizedBox(width: 12),
-          const Text('ClinicOS',
-              style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 18,
-                  fontWeight: FontWeight.w700)),
-          const Spacer(),
-          // Only show collapse arrow on desktop
-          if (!isMobile)
-            GestureDetector(
-              onTap: () => provider.setCollapsed(!collapsed),
-              child: const Icon(Icons.chevron_left,
-                  color: Colors.white38, size: 20),
-            )
-          else
-            GestureDetector(
-              onTap: () => provider.setMobileSidebar(false),
-              child: const Icon(Icons.close, color: Colors.white38, size: 20),
-            ),
-        ],
+            if (!collapsed) ...[
+              const SizedBox(width: 12),
+              const Text('ClinicOS',
+                  style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700)),
+            ],
+            const Spacer(),
+            if (!isMobile)
+              GestureDetector(
+                onTap: () => provider.setCollapsed(!collapsed),
+                child: const Icon(Icons.chevron_left,
+                    color: Colors.white38, size: 20),
+              )
+            else
+              GestureDetector(
+                onTap: () => provider.setMobileSidebar(false),
+                child:
+                    const Icon(Icons.close, color: Colors.white38, size: 20),
+              ),
+          ],
+        ),
       ),
     );
   }
 }
 
 class _SectionGroup extends StatelessWidget {
-  final VoidCallback? onItemTapped; // ADD
+  final void Function(String pageId)? onItemTapped;
   final NavSection group;
   final bool collapsed;
   const _SectionGroup(
@@ -272,7 +276,7 @@ class _SectionGroup extends StatelessWidget {
 }
 
 class _NavButton extends StatelessWidget {
-  final VoidCallback? onItemTapped;
+  final void Function(String pageId)? onItemTapped;
   final NavItem item;
   final bool collapsed;
   const _NavButton(
@@ -281,7 +285,10 @@ class _NavButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<AppProvider>();
-    final active = provider.page == item.id;
+    // FIX 2: only highlight if provider.page actually matches this item
+    // (blank page = nothing highlighted = we're on the Home grid)
+    final active =
+        provider.page.isNotEmpty && provider.page == item.id;
 
     return Tooltip(
       message: collapsed ? item.label : '',
@@ -290,9 +297,7 @@ class _NavButton extends StatelessWidget {
         onTap: () {
           provider.setPage(item.id);
           provider.setMobileSidebar(false);
-          onItemTapped?.call();
-          // notify MainLayout to switch to Home tab
-          // find the Sidebar's onItemTapped via context or pass it down
+          onItemTapped?.call(item.id); // pass the id up
         },
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 150),
@@ -300,8 +305,8 @@ class _NavButton extends StatelessWidget {
           padding: EdgeInsets.symmetric(
               horizontal: collapsed ? 0 : 12, vertical: 10),
           decoration: BoxDecoration(
-            // Glassmorphic overlay for active state
-            color: active ? Colors.white.withOpacity(0.15) : Colors.transparent,
+            color:
+                active ? Colors.white.withOpacity(0.15) : Colors.transparent,
             borderRadius: BorderRadius.circular(14),
           ),
           child: Row(
@@ -317,8 +322,9 @@ class _NavButton extends StatelessWidget {
                         style: TextStyle(
                             color: active ? Colors.white : Colors.white70,
                             fontSize: 14,
-                            fontWeight:
-                                active ? FontWeight.w600 : FontWeight.w400))),
+                            fontWeight: active
+                                ? FontWeight.w600
+                                : FontWeight.w400))),
                 if (active)
                   Container(
                       width: 6,
