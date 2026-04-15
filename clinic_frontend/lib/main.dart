@@ -3,9 +3,13 @@ import 'package:provider/provider.dart';
 import 'providers/app_provider.dart';
 import 'screens/login_screen.dart';
 import 'screens/main_layout.dart';
+import 'services/session.dart';
 
+void main()  async {
+  WidgetsFlutterBinding.ensureInitialized(); // ADD THIS
+  await Session.restore();  
 
-void main() {
+  
   runApp(
     ChangeNotifierProvider(
       create: (_) => AppProvider(),

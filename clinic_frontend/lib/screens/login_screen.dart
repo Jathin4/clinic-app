@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import '../providers/app_provider.dart';
 import '../services/api_client.dart';
 import '../widgets/app_widgets.dart';
+import '../services/session.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -13,54 +14,68 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  final _emailCtrl    = TextEditingController();
+  final _emailCtrl = TextEditingController();
   final _passwordCtrl = TextEditingController();
   bool _showPass = false, _loading = false;
   String _error = '';
 
   bool _showSetPassword = false;
   Map<String, dynamic>? _pendingUser;
-  final _newPassCtrl     = TextEditingController();
+  final _newPassCtrl = TextEditingController();
   final _confirmPassCtrl = TextEditingController();
   bool _showNewPass = false, _showConfirmPass = false;
   String _passError = '';
 
   @override
   void dispose() {
-    _emailCtrl.dispose(); _passwordCtrl.dispose();
-    _newPassCtrl.dispose(); _confirmPassCtrl.dispose();
+    _emailCtrl.dispose();
+    _passwordCtrl.dispose();
+    _newPassCtrl.dispose();
+    _confirmPassCtrl.dispose();
     super.dispose();
   }
 
   Future<void> _handleLogin() async {
     setState(() => _error = '');
     if (_emailCtrl.text.trim().isEmpty || _passwordCtrl.text.isEmpty) {
-      setState(() => _error = 'Email and Password are required'); return;
+      setState(() => _error = 'Email and Password are required');
+      return;
     }
     setState(() => _loading = true);
     try {
       final res = await http.post(
         Uri.parse('${ApiClient.baseUrl}/auth_login/'),
         headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'email': _emailCtrl.text.trim(), 'password': _passwordCtrl.text}),
+        body: jsonEncode(
+            {'email': _emailCtrl.text.trim(), 'password': _passwordCtrl.text}),
       );
       final data = jsonDecode(res.body);
       if (res.statusCode == 200 && data['ok'] == true) {
         final user = data['user'] as Map<String, dynamic>;
         _passwordCtrl.clear();
         if (user['last_login'] == null) {
-          setState(() { _pendingUser = user; _showSetPassword = true; });
+          setState(() {
+            _pendingUser = user;
+            _showSetPassword = true;
+          });
         } else {
+          // AFTER
+          await Session.setFromLoginResponse({
+            'clinic_id': user['clinic_id'],
+            'user_id': user['id'], // note: backend sends 'id', not 'user_id'
+            'role': user['role'],
+          });
           if (mounted) context.read<AppProvider>().setUser(user);
         }
       } else {
         _passwordCtrl.clear();
-        setState(() => _error = data['detail'] ?? 'Invalid credentials. Please try again.');
+        setState(() => _error =
+            data['detail'] ?? 'Invalid credentials. Please try again.');
       }
     } catch (e) {
-  _passwordCtrl.clear();
-  setState(() => _error = e.toString());
-} finally {
+      _passwordCtrl.clear();
+      setState(() => _error = e.toString());
+    } finally {
       if (mounted) setState(() => _loading = false);
     }
   }
@@ -68,34 +83,47 @@ class _LoginScreenState extends State<LoginScreen> {
   Future<void> _handleSetPassword() async {
     setState(() => _passError = '');
     if (_newPassCtrl.text.isEmpty || _confirmPassCtrl.text.isEmpty) {
-      setState(() => _passError = 'Both fields are required'); return;
+      setState(() => _passError = 'Both fields are required');
+      return;
     }
     if (_newPassCtrl.text.length < 6) {
-      setState(() => _passError = 'Password must be at least 6 characters'); return;
+      setState(() => _passError = 'Password must be at least 6 characters');
+      return;
     }
     if (_newPassCtrl.text != _confirmPassCtrl.text) {
-      setState(() => _passError = 'Passwords do not match'); return;
+      setState(() => _passError = 'Passwords do not match');
+      return;
     }
     setState(() => _loading = true);
     try {
       final res = await http.post(
         Uri.parse('${ApiClient.baseUrl}/auth_set_password/'),
         headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'user_id': _pendingUser!['id'], 'new_password': _newPassCtrl.text}),
+        body: jsonEncode({
+          'user_id': _pendingUser!['id'],
+          'new_password': _newPassCtrl.text
+        }),
       );
       final data = jsonDecode(res.body);
       if (res.statusCode == 200 && data['ok'] == true) {
-        _newPassCtrl.clear(); _confirmPassCtrl.clear();
+        _newPassCtrl.clear();
+        _confirmPassCtrl.clear();
         if (mounted) {
           setState(() => _showSetPassword = false);
-          context.read<AppProvider>().setUser(_pendingUser!);
+          await Session.setFromLoginResponse({
+  'clinic_id': _pendingUser!['clinic_id'],
+  'user_id':   _pendingUser!['id'],
+  'role':      _pendingUser!['role'],
+});
+context.read<AppProvider>().setUser(_pendingUser!);
         }
       } else {
-        setState(() => _passError = data['detail'] ?? 'Failed to set password.');
+        setState(
+            () => _passError = data['detail'] ?? 'Failed to set password.');
       }
     } catch (e) {
-  _passwordCtrl.clear();
-  setState(() => _error = 'Error: $e');  // show actual error
+      _passwordCtrl.clear();
+      setState(() => _error = 'Error: $e'); // show actual error
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -118,67 +146,67 @@ class _LoginScreenState extends State<LoginScreen> {
                   child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                    // Brand mark
-                    Container(
-                      width: 48,
-                      height: 48,
-                      decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                            colors: [AppColors.teal, AppColors.teal2],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight),
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                      child: const Icon(Icons.favorite_border,
-                          color: Colors.white, size: 22),
-                    ),
-                    const SizedBox(height: 28),
-                    const Text('Welcome back',
-                        style: TextStyle(
-                            fontSize: 28,
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.onSurface,
-                            letterSpacing: -0.5)),
-                    const SizedBox(height: 6),
-                    const Text('Sign in to your clinic dashboard',
-                        style: AppTextStyles.bodyMuted),
-                    const SizedBox(height: 32),
-                    if (_error.isNotEmpty) AppErrorBanner(message: _error),
+                        // Brand mark
+                        Container(
+                          width: 48,
+                          height: 48,
+                          decoration: BoxDecoration(
+                            gradient: const LinearGradient(
+                                colors: [AppColors.teal, AppColors.teal2],
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight),
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          child: const Icon(Icons.favorite_border,
+                              color: Colors.white, size: 22),
+                        ),
+                        const SizedBox(height: 28),
+                        const Text('Welcome back',
+                            style: TextStyle(
+                                fontSize: 28,
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.onSurface,
+                                letterSpacing: -0.5)),
+                        const SizedBox(height: 6),
+                        const Text('Sign in to your clinic dashboard',
+                            style: AppTextStyles.bodyMuted),
+                        const SizedBox(height: 32),
+                        if (_error.isNotEmpty) AppErrorBanner(message: _error),
 
-                    // Email
-                    const Text('EMAIL ADDRESS', style: AppTextStyles.label),
-                    const SizedBox(height: 6),
-                    TextField(
-                        controller: _emailCtrl,
-                        keyboardType: TextInputType.emailAddress,
-                        decoration: AppInput.deco('your@clinic.com',
-                            icon: Icons.email_outlined)),
-                    const SizedBox(height: 18),
+                        // Email
+                        const Text('EMAIL ADDRESS', style: AppTextStyles.label),
+                        const SizedBox(height: 6),
+                        TextField(
+                            controller: _emailCtrl,
+                            keyboardType: TextInputType.emailAddress,
+                            decoration: AppInput.deco('your@clinic.com',
+                                icon: Icons.email_outlined)),
+                        const SizedBox(height: 18),
 
-                    // Password
-                    const Text('PASSWORD', style: AppTextStyles.label),
-                    const SizedBox(height: 6),
-                    TextField(
-                      controller: _passwordCtrl,
-                      obscureText: !_showPass,
-                      decoration: AppInput.deco('Enter your password',
-                          suffixIcon: IconButton(
-                            icon: Icon(
-                                _showPass
-                                    ? Icons.visibility_off_outlined
-                                    : Icons.visibility_outlined,
-                                color: AppColors.textMuted,
-                                size: 20),
-                            onPressed: () =>
-                                setState(() => _showPass = !_showPass),
-                          )),
-                    ),
-                    const SizedBox(height: 28),
-                    AppPrimaryButton(
-                        label: 'Sign in to ClinicOS',
-                        loading: _loading,
-                        onPressed: _handleLogin),
-                  ]),
+                        // Password
+                        const Text('PASSWORD', style: AppTextStyles.label),
+                        const SizedBox(height: 6),
+                        TextField(
+                          controller: _passwordCtrl,
+                          obscureText: !_showPass,
+                          decoration: AppInput.deco('Enter your password',
+                              suffixIcon: IconButton(
+                                icon: Icon(
+                                    _showPass
+                                        ? Icons.visibility_off_outlined
+                                        : Icons.visibility_outlined,
+                                    color: AppColors.textMuted,
+                                    size: 20),
+                                onPressed: () =>
+                                    setState(() => _showPass = !_showPass),
+                              )),
+                        ),
+                        const SizedBox(height: 28),
+                        AppPrimaryButton(
+                            label: 'Sign in to ClinicOS',
+                            loading: _loading,
+                            onPressed: _handleLogin),
+                      ]),
                 ),
               ),
             ),
@@ -224,8 +252,7 @@ class _LeftPanel extends StatelessWidget {
             width: 44,
             height: 44,
             decoration: BoxDecoration(
-                color: Colors.white12,
-                borderRadius: BorderRadius.circular(14)),
+                color: Colors.white12, borderRadius: BorderRadius.circular(14)),
             child: const Icon(Icons.favorite_border,
                 color: Colors.white, size: 20),
           ),
@@ -242,8 +269,7 @@ class _LeftPanel extends StatelessWidget {
             width: 60,
             height: 3,
             decoration: BoxDecoration(
-                color: Colors.white30,
-                borderRadius: BorderRadius.circular(2))),
+                color: Colors.white30, borderRadius: BorderRadius.circular(2))),
         const SizedBox(height: 28),
         const Text('Modern Healthcare\nManagement Platform',
             style: TextStyle(
@@ -255,8 +281,7 @@ class _LeftPanel extends StatelessWidget {
         const SizedBox(height: 18),
         const Text(
             'Manage patients, appointments, billing, and revenue — all in one intelligent clinic platform.',
-            style: TextStyle(
-                color: Colors.white70, fontSize: 15, height: 1.7)),
+            style: TextStyle(color: Colors.white70, fontSize: 15, height: 1.7)),
         const SizedBox(height: 44),
         // Stats row
         Row(children: [
@@ -275,8 +300,8 @@ class _LeftPanel extends StatelessWidget {
                           fontSize: 22,
                           fontWeight: FontWeight.w700)),
                   Text(item[1],
-                      style: const TextStyle(
-                          color: Colors.white54, fontSize: 12)),
+                      style:
+                          const TextStyle(color: Colors.white54, fontSize: 12)),
                 ])),
         ]),
         const SizedBox(height: 40),
@@ -288,14 +313,12 @@ class _LeftPanel extends StatelessWidget {
             '99.9% Uptime'
           ])
             Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               decoration: BoxDecoration(
                   color: Colors.white10,
                   borderRadius: BorderRadius.circular(9999)),
               child: Text(tag,
-                  style: const TextStyle(
-                      color: Colors.white70, fontSize: 11)),
+                  style: const TextStyle(color: Colors.white70, fontSize: 11)),
             ),
         ]),
       ]),
@@ -349,8 +372,8 @@ class _SetPasswordOverlay extends StatelessWidget {
                   AppGradientIcon(icon: Icons.lock_open_outlined),
                   const SizedBox(width: 12),
                   const Text('Set Your Password',
-                      style: TextStyle(
-                          fontSize: 20, fontWeight: FontWeight.w700)),
+                      style:
+                          TextStyle(fontSize: 20, fontWeight: FontWeight.w700)),
                 ]),
                 const SizedBox(height: 10),
                 Text(

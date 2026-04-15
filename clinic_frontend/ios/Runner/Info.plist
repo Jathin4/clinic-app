@@ -6,6 +6,8 @@
 	<true/>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Camera is used for face recognition attendance</string>
 	<key>CFBundleDisplayName</key>
 	<string>Clinic App</string>
 	<key>CFBundleExecutable</key>

@@ -9,7 +9,8 @@ class ApiConfig {
   ///   'http://10.11.1.128:5020'   (LAN)
   ///   'http://192.168.1.10:5020'  (local dev)
   ///   'https://api.yourdomain.com'(production)
-  static const String baseUrl = 'http://98.70.50.9:5014';
+  ///   'http://98.70.50.9:5014'    (Server)
+  static const String baseUrl = 'http://10.11.1.128:5020';
 }
 
 class ApiClient {

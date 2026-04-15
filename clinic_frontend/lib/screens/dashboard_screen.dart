@@ -4,8 +4,9 @@ import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
 import '../providers/app_provider.dart';
 import '../widgets/app_widgets.dart';
+import '../services/api_client.dart';
 
-const _apiBase = 'http://10.11.1.128:5020';
+const _apiBase = ApiConfig.baseUrl;
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});

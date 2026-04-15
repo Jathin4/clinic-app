@@ -11,90 +11,60 @@ import 'payments_screen.dart';
 import 'inventory_screen.dart';
 import 'clinics_screen.dart';
 import 'placeholder_screen.dart';
+import 'scan_face_screen.dart';
+
 
 class HomeScreen extends StatelessWidget {
   final void Function(int) onTabChange;
   final void Function(String pageId)? onNavigate; // ADD THIS
   const HomeScreen({super.key, required this.onTabChange, this.onNavigate});
 
-  static const List<Map<String, dynamic>> _items = [
-    {
-      'title': 'Patients',
-      'iconName': 'Patient',
-      'color': Color(0xFF0E6C68),
-      'bg': Color(0xFFECFDF5)
-    },
-    {
-      'title': 'Appointments',
-      'iconName': 'Calendar',
-      'color': Color(0xFF3B82F6),
-      'bg': Color(0xFFEFF6FF)
-    },
-    {
-      'title': 'Encounters',
-      'iconName': 'Encounter',
-      'color': Color(0xFFF59E0B),
-      'bg': Color(0xFFFFFBEB)
-    },
-    {
-      'title': 'Bills',
-      'iconName': 'Bill',
-      'color': Color(0xFF8B5CF6),
-      'bg': Color(0xFFF5F3FF)
-    },
-    {
-      'title': 'Payments',
-      'iconName': 'Payment',
-      'color': Color(0xFF10B981),
-      'bg': Color(0xFFECFDF5)
-    },
-    {
-      'title': 'Inventory',
-      'iconName': 'Inventory',
-      'color': Color(0xFF3B82F6),
-      'bg': Color(0xFFEFF6FF)
-    },
-    {
-      'title': 'Clinics',
-      'iconName': 'Clinic',
-      'color': Color(0xFFEF4444),
-      'bg': Color(0xFFFEF2F2)
-    },
-    {
-      'title': 'Dashboard',
-      'iconName': 'Dashboard',
-      'color': Color(0xFF0E6C68),
-      'bg': Color(0xFFECFDF5)
-    },
+  List<Map<String, dynamic>> _itemsFor(Map<String, dynamic>? user) {
+  final role = (user?['role'] ?? '').toString().toLowerCase();
+  final items = [
+    {'title': 'Patients',      'iconName': 'Patient',    'color': const Color(0xFF0E6C68), 'bg': const Color(0xFFECFDF5)},
+    {'title': 'Appointments',  'iconName': 'Calendar',   'color': const Color(0xFF3B82F6), 'bg': const Color(0xFFEFF6FF)},
+    {'title': 'Encounters',    'iconName': 'Encounter',  'color': const Color(0xFFF59E0B), 'bg': const Color(0xFFFFFBEB)},
+    {'title': 'Bills',         'iconName': 'Bill',       'color': const Color(0xFF8B5CF6), 'bg': const Color(0xFFF5F3FF)},
+    {'title': 'Payments',      'iconName': 'Payment',    'color': const Color(0xFF10B981), 'bg': const Color(0xFFECFDF5)},
+    {'title': 'Inventory',     'iconName': 'Inventory',  'color': const Color(0xFF3B82F6), 'bg': const Color(0xFFEFF6FF)},
+    {'title': 'Clinics',       'iconName': 'Clinic',     'color': const Color(0xFFEF4444), 'bg': const Color(0xFFFEF2F2)},
+    {'title': 'Dashboard',     'iconName': 'Dashboard',  'color': const Color(0xFF0E6C68), 'bg': const Color(0xFFECFDF5)},
+    if (role == 'doctor')
+      {'title': 'Scan Face',   'iconName': 'Scan',       'color': const Color(0xFF0E6C68), 'bg': const Color(0xFFECFDF5)},
   ];
+  return items;
+}
 
-  Widget _screenFor(String title) {
-    switch (title) {
-      case 'Patients':
-        return const PatientsScreen();
-      case 'Appointments':
-        return const AppointmentsScreen();
-      case 'Encounters':
-        return const EncountersScreen();
-      case 'Bills':
-        return const BillsScreen();
-      case 'Payments':
-        return const PaymentsScreen();
-      case 'Inventory':
-        return const InventoryScreen();
-      case 'Clinics':
-        return const ClinicsScreen();
-      case 'Dashboard':
-        return const DashboardScreen();
-      default:
-        return PlaceholderScreen(title: title, icon: Icons.hourglass_empty);
-    }
+
+ Widget _screenFor(String title) {
+  switch (title) {
+    case 'Patients':
+      return const PatientsScreen();
+    case 'Appointments':
+      return const AppointmentsScreen();
+    case 'Encounters':
+      return const EncountersScreen();
+    case 'Bills':
+      return const BillsScreen();
+    case 'Payments':
+      return const PaymentsScreen();
+    case 'Inventory':
+      return const InventoryScreen();
+    case 'Clinics':
+      return const ClinicsScreen();
+    case 'Dashboard':
+      return const DashboardScreen();
+    default:
+      return PlaceholderScreen(title: title, icon: Icons.hourglass_empty);
   }
+}
 
   String _pageIdFor(String title) {
   switch (title) {
     case 'Patients':      return 'patients';
     case 'Appointments':  return 'appointments';
+    case 'Scan':          return 'scan_face';
     case 'Encounters':    return 'encounters';
     case 'Bills':         return 'bills';
     case 'Payments':      return 'payments';
@@ -106,11 +76,18 @@ class HomeScreen extends StatelessWidget {
 }
 
   void _push(BuildContext context, String title) {
+  if (title == 'Scan Face') {
+    final user = context.read<AppProvider>().user;
+    final clinicId = (user?['clinic_id'] ?? 0) as int;
+    Navigator.push(context, MaterialPageRoute(
+      builder: (_) => ScanFaceScreen(clinicId: clinicId),
+    ));
+    return;
+  }
   if (onNavigate != null) {
     onNavigate!(_pageIdFor(title));
   } else {
-    Navigator.push(
-        context, MaterialPageRoute(builder: (_) => _screenFor(title)));
+    Navigator.push(context, MaterialPageRoute(builder: (_) => _screenFor(title)));
   }
 }
 
@@ -225,7 +202,7 @@ class HomeScreen extends StatelessWidget {
           child: Padding(
             padding: const EdgeInsets.all(16),
             child: GridView.builder(
-              itemCount: _items.length,
+              itemCount: _itemsFor(user).length,
               gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                 crossAxisCount: 3,
                 crossAxisSpacing: 12,
@@ -233,7 +210,7 @@ class HomeScreen extends StatelessWidget {
                 childAspectRatio: 0.95,
               ),
               itemBuilder: (context, index) {
-                final item = _items[index];
+                final item = _itemsFor(user)[index];
                 final title = item['title'] as String;
                 return _HomeCard(
                   title: title,
