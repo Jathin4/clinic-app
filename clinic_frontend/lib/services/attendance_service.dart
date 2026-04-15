@@ -1,8 +1,9 @@
 import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import '../services/api_client.dart';
 
-const String baseUrl = 'http://10.11.1.128:5020';
+const String baseUrl = ApiConfig.baseUrl;
 
 class AttendanceService {
   // ── Upload Doctor Face ─────────────────────────────────────
